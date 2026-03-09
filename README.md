@@ -24,7 +24,7 @@ Built for the Israeli high-tech market with a focus on Data Science, AI Engineer
 - **Database**: PostgreSQL + Prisma ORM
 - **AI**: Anthropic Claude API (server-side only)
 - **Validation**: Zod schemas for all API payloads and LLM outputs
-- **Auth**: NextAuth.js (single-user mode)
+- **Auth**: NextAuth.js (`single-user only`)
 
 ## Architecture Highlights
 
@@ -42,7 +42,7 @@ npm install
 
 # Set up environment variables
 cp .env.example .env.local
-# Fill in: DATABASE_URL, NEXTAUTH_SECRET, ANTHROPIC_API_KEY
+# Fill in: DATABASE_URL, NEXTAUTH_SECRET, ANTHROPIC_API_KEY, SINGLE_USER_PASSWORD
 
 # Push database schema
 npx prisma db push
@@ -55,6 +55,8 @@ npm run dev
 ```
 
 Open: `http://localhost:3000`
+
+Login is single-user only and uses password only (no email field).
 
 ## Key Pages
 

@@ -5,7 +5,6 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -15,7 +14,7 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true); setError("");
     const result = await signIn("credentials", {
-      email, password, redirect: false,
+      password, redirect: false,
     });
     if (result?.error) {
       setError("Invalid credentials");
@@ -90,35 +89,11 @@ export default function LoginPage() {
               Welcome back
             </div>
             <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 6, letterSpacing: 0.3 }}>
-              Log in to continue your momentum.
+              Single-user secure access.
             </div>
           </div>
 
           <form onSubmit={handleLogin}>
-            <div style={{ marginBottom: 14 }}>
-              <label
-                style={{
-                  fontSize: 9,
-                  color: "var(--text-muted)",
-                  letterSpacing: 1.8,
-                  display: "block",
-                  marginBottom: 6,
-                  textTransform: "uppercase",
-                  fontFamily: "var(--font-mono)",
-                }}
-              >
-                Email
-              </label>
-              <input
-                className="jh-input"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="meital@example.com"
-                required
-                style={{ padding: "10px 12px", fontSize: 13 }}
-              />
-            </div>
             <div style={{ marginBottom: 20 }}>
               <label
                 style={{
@@ -145,7 +120,7 @@ export default function LoginPage() {
 
             {error && (
               <div style={{ fontSize: 12, color: "var(--red)", marginBottom: 12, textAlign: "center" }}>
-                {error}
+                Wrong password
               </div>
             )}
 

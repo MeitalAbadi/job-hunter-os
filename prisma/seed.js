@@ -5,17 +5,26 @@ require("dotenv").config({ path: ".env" });
 const db = new PrismaClient();
 
 async function main() {
+  const singleUserEmail =
+    process.env.SINGLE_USER_EMAIL || "meital@jobhunter.local";
+  const singleUserName =
+    process.env.SINGLE_USER_NAME || "Meital Abadi";
+  const singleUserPassword =
+    process.env.SINGLE_USER_PASSWORD ||
+    process.env.SEED_PASSWORD ||
+    "changeme123";
+
   const passwordHash = await bcrypt.hash(
-    process.env.SEED_PASSWORD || "changeme123",
+    singleUserPassword,
     12
   );
 
   const user = await db.user.upsert({
-    where: { email: "meital@jobhunter.local" },
+    where: { email: singleUserEmail },
     update: {},
     create: {
-      email: "meital@jobhunter.local",
-      name: "Meital Abadi",
+      email: singleUserEmail,
+      name: singleUserName,
       passwordHash,
     },
   });
@@ -25,7 +34,7 @@ async function main() {
     update: {},
     create: {
       userId: user.id,
-      fullName: "Meital Abadi",
+      fullName: singleUserName,
       headline:
         "Data Scientist & AI Engineer | Technion B.Sc. | NLP · ML · LLM Pipelines",
       bio: "Recent Technion Data Science graduate focused on end-to-end ML and NLP systems.",
@@ -158,8 +167,8 @@ async function main() {
   }
 
   console.log("Seed complete");
-  console.log("Login: meital@jobhunter.local");
-  console.log(`Password: ${process.env.SEED_PASSWORD || "changeme123"}`);
+  console.log(`Single user: ${singleUserEmail}`);
+  console.log(`Password: ${singleUserPassword}`);
 }
 
 main()

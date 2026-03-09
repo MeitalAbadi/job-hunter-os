@@ -1,31 +1,19 @@
 import type { AuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
-import bcrypt from "bcryptjs";
-import { db } from "../db";
+import { authenticateSingleUser } from "./single-user";
 
 export const authOptions: AuthOptions = {
   providers: [
     CredentialsProvider({
       name: "credentials",
       credentials: {
-        email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) return null;
+        if (!credentials?.password) return null;
 
-        const user = await db.user.findUnique({
-          where: { email: credentials.email },
-        });
-
+        const user = await authenticateSingleUser(credentials.password);
         if (!user) return null;
-
-        const passwordValid = await bcrypt.compare(
-          credentials.password,
-          user.passwordHash
-        );
-
-        if (!passwordValid) return null;
 
         return {
           id: user.id,
