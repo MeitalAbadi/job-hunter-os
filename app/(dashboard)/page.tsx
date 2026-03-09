@@ -1,21 +1,20 @@
 // app/(dashboard)/page.tsx
-export const dynamic = "force-dynamic";
-
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth/options";
 import { db } from "../../lib/db";
-import { getOrCreateSingleUserContext } from "@/lib/auth/single-user";
 import Link from "next/link";
 
-async function getDashboardData() {
-  const context = await getOrCreateSingleUserContext();
-  const profile = await db.candidateProfile.findUnique({
-    where: { id: context.candidateProfileId },
+async function getDashboardData(email: string) {
+  const user = await db.user.findUnique({
+    where: { email },
+    include: { candidateProfile: true },
   });
 
-  if (!profile) {
+  if (!user?.candidateProfile) {
     return { profile: null, stats: null, recentApps: [] };
   }
 
-  const profileId = profile.id;
+  const profileId = user.candidateProfile.id;
 
   const [totalJobs, scoredJobs, appsByStatus, recentApps, followUpsDue] = await Promise.all([
     db.job.count({ where: { isActive: true } }),
@@ -57,7 +56,7 @@ async function getDashboardData() {
     .reduce((sum, s) => sum + s._count, 0);
 
   return {
-    profile,
+    profile: user.candidateProfile,
     stats: { totalJobs, strongApply, totalApps, activeApps, offers, interviews, followUpsDue },
     recentApps,
   };
@@ -75,22 +74,36 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 export default async function DashboardPage() {
-  const { profile, stats, recentApps } = await getDashboardData();
+  const session = await getServerSession(authOptions);
+  const { profile, stats, recentApps } = await getDashboardData(session!.user!.email!);
 
   if (!profile) {
     return (
       <div style={{ padding: 40, textAlign: "center" }}>
         <div style={{ fontSize: 40, marginBottom: 16 }}>◉</div>
-        <h2 style={{ color: "var(--accent)", marginBottom: 8 }}>Set up your profile first</h2>
+        <h2 style={{ color: "var(--accent)", marginBottom: 8, fontFamily: "var(--font-display)" }}>
+          Set up your profile first
+        </h2>
         <p style={{ color: "var(--text-secondary)", marginBottom: 20 }}>
           Before the system can work for you, it needs to know who you are.
         </p>
-        <Link href="/profile" style={{
-          display: "inline-block", padding: "10px 20px",
-          background: "var(--accent)", color: "var(--bg-base)",
-          textDecoration: "none", borderRadius: 6, fontWeight: 700, fontSize: 12,
-        }}>
-          Complete Your Profile →
+        <Link
+          href="/onboarding"
+          className="jh-button jh-button-primary"
+          style={{
+            display: "inline-block",
+            padding: "10px 20px",
+            color: "white",
+            textDecoration: "none",
+            borderRadius: 10,
+            fontWeight: 700,
+            fontSize: 12,
+            border: "none",
+            fontFamily: "var(--font-mono)",
+            letterSpacing: 1,
+          }}
+        >
+          Start Onboarding →
         </Link>
       </div>
     );
@@ -99,26 +112,31 @@ export default async function DashboardPage() {
   return (
     <div className="animate-fadeIn">
       {/* Header */}
-      <div style={{
-        padding: "20px 28px",
-        borderBottom: "1px solid var(--border)",
-        background: "var(--bg-surface)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-      }}>
+      <div className="jh-page-header">
         <div>
-          <h1 style={{ fontSize: 16, fontWeight: 700, letterSpacing: 0.5 }}>Command Center</h1>
+          <h1 className="jh-page-title">Command Center</h1>
           <p style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 2 }}>
-            Job Search OS — {profile.fullName}
+            Your momentum hub, {profile.fullName}
           </p>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
-          <Link href="/jobs" style={{
-            display: "inline-flex", alignItems: "center", gap: 6,
-            padding: "8px 14px", background: "var(--accent)", color: "var(--bg-base)",
-            textDecoration: "none", borderRadius: 6, fontSize: 11, fontWeight: 700, letterSpacing: 1,
-          }}>
+          <Link
+            href="/jobs"
+            className="jh-button jh-button-primary"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "9px 14px",
+              color: "white",
+              border: "none",
+              textDecoration: "none",
+              fontSize: 11,
+              fontWeight: 700,
+              letterSpacing: 1,
+              fontFamily: "var(--font-mono)",
+            }}
+          >
             ◎ Add Job
           </Link>
         </div>
@@ -144,7 +162,7 @@ export default async function DashboardPage() {
 
         {/* Stats Grid */}
         {stats && (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 24 }}>
+          <div className="jh-inline-grid" style={{ marginBottom: 24 }}>
             {[
               { label: "Jobs in Inbox", val: stats.totalJobs, sub: `${stats.strongApply} strong match`, color: "var(--accent)", href: "/jobs" },
               { label: "Active Pipeline", val: stats.activeApps, sub: `${stats.totalApps} total applied`, color: "var(--purple)", href: "/applications" },
@@ -152,11 +170,15 @@ export default async function DashboardPage() {
               { label: "Offers", val: stats.offers, sub: stats.offers > 0 ? "🎉 Congratulations!" : "keep pushing", color: "var(--green)", href: "/applications" },
             ].map((stat) => (
               <Link key={stat.label} href={stat.href} style={{ textDecoration: "none" }}>
-                <div style={{
-                  background: "var(--bg-surface)", border: "1px solid var(--border)",
-                  borderRadius: 10, padding: 18, cursor: "pointer",
-                  transition: "border-color 0.15s",
-                }}>
+                <div
+                  className="jh-card"
+                  style={{
+                    borderRadius: 16,
+                    padding: 18,
+                    cursor: "pointer",
+                    transition: "border-color 0.15s",
+                  }}
+                >
                   <div style={{ fontSize: 36, fontWeight: 800, color: stat.color, lineHeight: 1 }}>
                     {stat.val}
                   </div>
@@ -168,9 +190,9 @@ export default async function DashboardPage() {
           </div>
         )}
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 20 }}>
           {/* Recent Applications */}
-          <div style={{ background: "var(--bg-surface)", border: "1px solid var(--border)", borderRadius: 10, padding: 20 }}>
+          <div className="jh-card" style={{ borderRadius: 16, padding: 20 }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 16 }}>
               <span style={{ fontSize: 12, fontWeight: 700 }}>Recent Applications</span>
               <Link href="/applications" style={{ fontSize: 11, color: "var(--accent)", textDecoration: "none" }}>View all →</Link>
@@ -212,7 +234,7 @@ export default async function DashboardPage() {
           </div>
 
           {/* System Modules */}
-          <div style={{ background: "var(--bg-surface)", border: "1px solid var(--border)", borderRadius: 10, padding: 20 }}>
+          <div className="jh-card" style={{ borderRadius: 16, padding: 20 }}>
             <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 16 }}>Active Modules</div>
             {[
               { href: "/jobs", icon: "◎", label: "Job Analyzer", desc: "Ingest & score jobs", status: "active" },

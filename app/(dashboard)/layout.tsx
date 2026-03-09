@@ -1,4 +1,7 @@
 // app/(dashboard)/layout.tsx
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth/options";
+import { redirect } from "next/navigation";
 import { Sidebar } from "../../components/dashboard/Sidebar";
 
 export default async function DashboardLayout({
@@ -6,16 +9,13 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const session = await getServerSession(authOptions);
+  if (!session) redirect("/login");
+
   return (
-    <div style={{ display: "flex", height: "100vh", overflow: "hidden" }}>
+    <div className="dashboard-shell">
       <Sidebar />
-      <main style={{
-        flex: 1,
-        overflow: "auto",
-        background: "var(--bg-base)",
-      }}>
-        {children}
-      </main>
+      <main className="dashboard-main">{children}</main>
     </div>
   );
 }
