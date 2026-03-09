@@ -1,0 +1,724 @@
+// Prisma Schema — Job Hunter OS
+// Production-grade schema for Meital's personal job search operating system
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Auth ───────────────────────────────────────────────────────────────────
+
+model User {
+  id               String           @id @default(cuid())
+  email            String           @unique
+  name             String?
+  passwordHash     String
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  candidateProfile CandidateProfile?
+  candidateIntake  CandidateIntake?
+}
+
+// ─── Candidate Profile ───────────────────────────────────────────────────────
+
+model CandidateProfile {
+  id                   String    @id @default(cuid())
+  userId               String    @unique
+  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Identity
+  fullName             String
+  headline             String?
+  bio                  String?
+  location             String    @default("Israel")
+  linkedinUrl          String?
+  githubUrl            String?
+  portfolioUrl         String?
+  languages            String[]  @default(["Hebrew", "English"])
+
+  // Compensation targets
+  targetSalaryMin      Int?
+  targetSalaryIdeal    Int?
+  targetSalaryCurrency String    @default("ILS")
+
+  // Search preferences (stored as JSON for flexibility)
+  workModePrefs        Json      @default("[\"hybrid\",\"onsite\",\"remote\"]")
+  targetCities         Json      @default("[\"Tel Aviv\",\"Herzliya\",\"Haifa\",\"Ramat Gan\",\"Ra'anana\",\"Remote\"]")
+  targetCompanyStages  Json      @default("[\"startup\",\"growth\",\"public\",\"enterprise\"]")
+  targetIndustries     Json      @default("[]")
+  noGoCompanies        String[]  @default([])
+  rolePreferences      Json      @default("[\"Data Scientist\",\"AI Engineer\",\"AI Analyst\",\"Data Analyst\",\"Analytics Engineer\",\"ML Engineer\"]")
+
+  // Scoring weights (user-configurable, 0–100 each)
+  weightSpeed          Int       @default(25)   // speed to interview
+  weightFit            Int       @default(30)   // role fit
+  weightSalary         Int       @default(25)   // compensation upside
+  weightUpside         Int       @default(20)   // career upside
+
+  // Narrative & outreach preferences
+  outreachVoice        String?   // e.g. "concise and direct", "warm and personal"
+  uniqueAngles         String[]  @default([])   // differentiating narrative angles
+
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  // Relations
+  skills               CandidateSkill[]
+  projects             Project[]
+  experienceEpisodes   ExperienceEpisode[]
+  interviewStories     InterviewStory[]
+  applications         Application[]
+  resumeVersions       ResumeVersion[]
+  experiments          Experiment[]
+}
+
+model CandidateIntake {
+  id                           String                @id @default(cuid())
+  userId                       String                @unique
+  user                         User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status                       CandidateIntakeStatus @default(DRAFT)
+  targetTitle                  String?
+  fallbackTitles               String[]              @default([])
+  minimumSalaryIls             Int?
+  idealSalaryMinIls            Int?
+  idealSalaryMaxIls            Int?
+  acceptableCities             String[]              @default([])
+  conditionalCities            String[]              @default([])
+  unacceptableCities           String[]              @default([])
+  workModes                    WorkMode[]            @default([HYBRID, ONSITE, REMOTE])
+  roleSeniorityTarget          String?
+  constraintsNotes             String?
+  topTargetCompanies           String[]              @default([])
+  preferredStages              String[]              @default([])
+  preferredDomains             String[]              @default([])
+  avoidDomains                 String[]              @default([])
+  preferredTeamTypes           String[]              @default([])
+  avoidIndustries              String[]              @default([])
+  strongestTopics              String[]              @default([])
+  weakestTopics                String[]              @default([])
+  stressfulInterviewTypes      String[]              @default([])
+  missingMaterials             String[]              @default([])
+  confidenceRecruiterInterview Int?
+  confidenceTechnicalInterview Int?
+  confidenceCaseInterview      Int?
+  confidenceBehavioralInterview Int?
+  hebrewCommunicationConfidence Int?
+  englishCommunicationConfidence Int?
+  writingConfidence            Int?
+  liveInterviewConfidence      Int?
+  preferredOutreachTone        String?
+  preferredPositioningStyle    String?
+  outreachAvoidances           String[]              @default([])
+  completedAt                  DateTime?
+  createdAt                    DateTime              @default(now())
+  updatedAt                    DateTime              @updatedAt
+}
+
+enum CandidateIntakeStatus {
+  DRAFT
+  COMPLETED
+}
+
+// ─── Skills ──────────────────────────────────────────────────────────────────
+
+model Skill {
+  id             String           @id @default(cuid())
+  name           String           @unique
+  canonicalName  String
+  category       SkillCategory
+  createdAt      DateTime         @default(now())
+  candidateSkills CandidateSkill[]
+}
+
+enum SkillCategory {
+  PROGRAMMING_LANGUAGE
+  ML_FRAMEWORK
+  DATA_TOOL
+  BI_TOOL
+  CLOUD
+  DATABASE
+  MOBILE
+  OTHER
+}
+
+model CandidateSkill {
+  id                 String           @id @default(cuid())
+  candidateProfileId String
+  candidateProfile   CandidateProfile @relation(fields: [candidateProfileId], references: [id], onDelete: Cascade)
+  skillId            String
+  skill              Skill            @relation(fields: [skillId], references: [id])
+  proficiency        ProficiencyLevel @default(INTERMEDIATE)
+  lastUsedAt         DateTime?
+  interviewConfidence Int?
+  productionConfidence Int?
+  selfReportedOnly   Boolean          @default(true)
+  profileNotes       String?
+  evidenceNote       String?
+  priority           Int              @default(50)  // 0–100, higher = more prominent on CV
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  evidenceRecords    SkillEvidence[]
+
+  @@unique([candidateProfileId, skillId])
+}
+
+enum ProficiencyLevel {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+  EXPERT
+}
+
+model SkillEvidence {
+  id               String       @id @default(cuid())
+  candidateSkillId String
+  candidateSkill   CandidateSkill @relation(fields: [candidateSkillId], references: [id], onDelete: Cascade)
+  evidenceType     EvidenceType
+  title            String
+  description      String?
+  outcome          String?
+  evidenceDate     DateTime?
+  credibility      Int?
+  url              String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+}
+
+enum EvidenceType {
+  PROJECT
+  COURSE
+  INTERVIEW
+  WORK_EXPERIENCE
+  EXERCISE
+  CERTIFICATION
+  OTHER
+}
+
+// ─── Projects ────────────────────────────────────────────────────────────────
+
+model Project {
+  id                 String           @id @default(cuid())
+  candidateProfileId String
+  candidateProfile   CandidateProfile @relation(fields: [candidateProfileId], references: [id], onDelete: Cascade)
+
+  name               String
+  shortSummary       String
+  longDescription    String?
+  impactMetrics      Json             @default("[]")  // [{metric, value, context}]
+  techTags           String[]         @default([])
+  roleTags           String[]         @default([])    // which role families this is relevant for
+  bulletBank         Json             @default("[]")  // [{text, roleTag, strength}]
+  interviewStory     String?          // STAR format story
+  confidenceLevel    Int              @default(70)    // 0–100
+  evidenceLinks      String[]         @default([])
+  displayOrder       Int              @default(0)
+
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+}
+
+model ExperienceEpisode {
+  id                  String           @id @default(cuid())
+  candidateProfileId  String
+  candidateProfile    CandidateProfile @relation(fields: [candidateProfileId], references: [id], onDelete: Cascade)
+  title               String
+  organization        String?
+  context             String?
+  technicalOwnership  String?
+  collaborators       String[]         @default([])
+  dataScale           String?
+  toolingStack        String[]         @default([])
+  tradeoffs           String[]         @default([])
+  impact              String?
+  biggestChallenge    String?
+  resolution          String?
+  interviewConfidence Int?
+  externallyUsable    Boolean          @default(true)
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+}
+
+model InterviewStory {
+  id                 String             @id @default(cuid())
+  candidateProfileId String
+  candidateProfile   CandidateProfile   @relation(fields: [candidateProfileId], references: [id], onDelete: Cascade)
+  type               InterviewStoryType @default(PROJECT)
+  title              String
+  situation          String
+  task               String
+  action             String
+  result             String
+  topics             String[]           @default([])
+  confidence         Int?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+}
+
+enum InterviewStoryType {
+  BEHAVIORAL
+  TECHNICAL
+  LEADERSHIP
+  FAILURE
+  PROJECT
+  CONFLICT
+  OWNERSHIP
+}
+
+// ─── Companies ───────────────────────────────────────────────────────────────
+
+model Company {
+  id             String        @id @default(cuid())
+  name           String        @unique
+  website        String?
+  careersUrl     String?
+  hqLocation     String?
+  israelPresence Boolean       @default(true)
+  industry       String?
+  stage          CompanyStage?
+  notes          String?
+  sourceData     Json          @default("{}")  // raw data from public sources
+  isWatchlisted  Boolean       @default(false)
+
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  jobs           Job[]
+  applications   Application[]
+  contacts       OutreachContact[]
+}
+
+enum CompanyStage {
+  SEED
+  SERIES_A
+  SERIES_B
+  SERIES_C_PLUS
+  GROWTH
+  PUBLIC
+  ENTERPRISE
+}
+
+// ─── Jobs ────────────────────────────────────────────────────────────────────
+
+model Job {
+  id                  String      @id @default(cuid())
+  companyId           String?
+  company             Company?    @relation(fields: [companyId], references: [id])
+
+  // Core job data
+  title               String
+  normalizedTitle     String?
+  rawDescription      String
+  normalizedDescription String?
+
+  // Source info
+  source              JobSource
+  sourceUrl           String?
+  atsPlatform         String?     // greenhouse, lever, comeet, etc
+  externalId          String?     // ATS-native job ID for dedup
+
+  // Location & logistics
+  location            String?
+  workMode            WorkMode?
+  employmentType      EmploymentType?
+  salaryRangeMin      Int?
+  salaryRangeMax      Int?
+  salaryCurrency      String?
+
+  // Extracted structured data
+  keywords            String[]    @default([])
+  requiredSkills      String[]    @default([])
+  niceToHaveSkills    String[]    @default([])
+  seniority           String?
+
+  // Status
+  isActive            Boolean     @default(true)
+  postedAt            DateTime?
+  expiresAt           DateTime?
+
+  // Hidden opportunity metadata
+  isHiddenOpportunity Boolean     @default(false)
+  hiddenOpportunitySignal String?
+
+  // Dedup hash (company + normalized title + location)
+  dedupHash           String?     @unique
+
+  // Outreach tracking (Phase 4)
+  outreachStatus      OutreachStatus @default(NOT_GENERATED)
+
+  // Batch ingestion metadata
+  telegramMessageId   String?
+  telegramChannelId   String?
+  batchIngestionRunId String?
+
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+
+  scores              JobScore[]
+  applications        Application[]
+  resumeVersions      ResumeVersion[]
+  outreachMessages    OutreachMessage[]
+}
+
+enum OutreachStatus {
+  NOT_GENERATED
+  DRAFTED
+  SENT_MANUALLY
+  REPLIED
+}
+
+enum JobSource {
+  MANUAL_PASTE
+  MANUAL_URL
+  GREENHOUSE
+  LEVER
+  COMEET
+  COMPANY_CAREERS
+  USER_UPLOAD
+  HIDDEN_LEAD
+  REFERRAL
+  TELEGRAM
+}
+
+enum WorkMode {
+  ONSITE
+  HYBRID
+  REMOTE
+  FLEXIBLE
+}
+
+enum EmploymentType {
+  FULL_TIME
+  PART_TIME
+  CONTRACT
+  INTERNSHIP
+}
+
+// ─── Job Scoring ─────────────────────────────────────────────────────────────
+
+model JobScore {
+  id                 String           @id @default(cuid())
+  jobId              String
+  job                Job              @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  candidateProfileId String
+
+  // Composite score
+  totalScore         Float            // 0–100
+  recommendation     ScoreRecommendation
+
+  // Deterministic sub-scores (each 0–100 with weight)
+  roleFamilyScore    Float
+  mustHaveSkillScore Float
+  niceToHaveScore    Float
+  seniorityScore     Float
+  projectScore       Float
+  domainScore        Float
+  locationScore      Float
+  salaryScore        Float
+
+  // Meta
+  confidence         Float            // 0–1 how confident the scoring is
+  breakdown          Json             // full scored breakdown for UI display
+  strengths          String[]         @default([])
+  risks              String[]         @default([])
+  llmExplanation     String?          // LLM-generated narrative explanation
+  llmRawResponse     String?          // raw model response for debugging
+
+  // Action recommendation layer (Phase 2)
+  actionRecommendation ActionRecommendation?
+  blockersSummary      String?          // comma-separated blocker list
+  whyApply             String?          // deterministic rationale for applying
+  whyNotApply          String?          // deterministic rationale against
+  blockers             Json             @default("[]")  // structured blocker objects
+
+  scoredAt           DateTime         @default(now())
+
+  @@unique([jobId, candidateProfileId])
+}
+
+enum ScoreRecommendation {
+  STRONG_APPLY
+  APPLY
+  STRETCH_APPLY
+  LOW_PRIORITY
+  SKIP
+}
+
+enum ActionRecommendation {
+  APPLY_NOW
+  APPLY_THIS_WEEK
+  STRETCH_APPLY
+  OPTIONAL
+  SKIP_ONLY_IF_CLEAR_BLOCKER
+}
+
+// ─── Resume Versions ─────────────────────────────────────────────────────────
+
+model ResumeVersion {
+  id                   String           @id @default(cuid())
+  candidateProfileId   String
+  candidateProfile     CandidateProfile @relation(fields: [candidateProfileId], references: [id], onDelete: Cascade)
+  jobId                String?
+  job                  Job?             @relation(fields: [jobId], references: [id])
+
+  name                 String           // e.g. "CV_Voyantis_DataScientist_v1"
+  roleFamily           String
+  language             String           @default("en")
+  templateName         String           @default("standard")
+
+  // Generated content
+  summaryText          String
+  selectedProjectIds   String[]         @default([])
+  selectedSkillIds     String[]         @default([])
+  insertedKeywords     String[]         @default([])
+  bulletVariants       Json             @default("[]")  // final bullet set used
+  generationPrompt     String?          // system prompt used (for auditability)
+  generationMetadata   Json             @default("{}")
+  emphasis             String?          // e.g. "analytics-heavy", "ai-heavy"
+  generationRationale  String?          // short explanation of what was emphasized
+
+  // Quality & status
+  qualityScore         Float?           // 0–100 automated quality check
+  qualityIssues        String[]         @default([])
+  status               ResumeStatus     @default(DRAFT)
+
+  // Files
+  fileUrl              String?
+  fileFormat           String?          // pdf, docx, txt
+
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+
+  applications         Application[]
+}
+
+enum ResumeStatus {
+  DRAFT
+  REVIEWED
+  APPROVED
+  USED
+  ARCHIVED
+}
+
+// ─── Outreach ─────────────────────────────────────────────────────────────────
+
+model OutreachContact {
+  id              String          @id @default(cuid())
+  companyId       String?
+  company         Company?        @relation(fields: [companyId], references: [id])
+
+  fullName        String
+  source          String          // how we found this contact (user-provided, public page, etc)
+  sourceUrl       String?
+  title           String?
+  contactType     ContactType
+  relationshipType RelationshipType @default(UNKNOWN)
+  priorityScore   Int             @default(50)  // 0–100
+  confidence      Float           @default(0.7)
+  notes           String?
+  linkedinUrl     String?
+
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  messages        OutreachMessage[]
+}
+
+enum ContactType {
+  RECRUITER
+  HIRING_MANAGER
+  TEAM_MEMBER
+  ALUMNI
+  FOUNDER
+  ANALYTICS_LEAD
+  ENGINEERING_MANAGER
+  TA_PARTNER
+  OTHER
+}
+
+enum RelationshipType {
+  FIRST_DEGREE
+  SECOND_DEGREE
+  THIRD_DEGREE
+  ALUMNI
+  COLD
+  UNKNOWN
+}
+
+model OutreachMessage {
+  id              String          @id @default(cuid())
+  contactId       String
+  contact         OutreachContact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  jobId           String?
+  job             Job?            @relation(fields: [jobId], references: [id])
+
+  messageType     MessageType
+  channel         MessageChannel
+  draftText       String
+  status          MessageStatus   @default(DRAFT)
+  tone            String?
+  characterCount  Int?
+  metadata        Json            @default("{}")
+
+  sentAt          DateTime?
+  repliedAt       DateTime?
+  replyText       String?
+
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+}
+
+enum MessageType {
+  CONNECTION_REQUEST
+  REFERRAL_ASK
+  DIRECT_RECRUITER_INTRO
+  POST_APPLICATION_NUDGE
+  INTERVIEW_THANK_YOU
+  REACTIVATION
+  LINKEDIN_DM
+}
+
+enum MessageChannel {
+  LINKEDIN
+  EMAIL
+  WHATSAPP
+  OTHER
+}
+
+enum MessageStatus {
+  DRAFT
+  REVIEWED
+  SENT
+  REPLIED
+  NO_RESPONSE
+  DECLINED
+}
+
+// ─── Applications CRM ─────────────────────────────────────────────────────────
+
+model Application {
+  id                 String           @id @default(cuid())
+  candidateProfileId String
+  candidateProfile   CandidateProfile @relation(fields: [candidateProfileId], references: [id], onDelete: Cascade)
+  companyId          String?
+  company            Company?         @relation(fields: [companyId], references: [id])
+  jobId              String?
+  job                Job?             @relation(fields: [jobId], references: [id])
+  resumeVersionId    String?
+  resumeVersion      ResumeVersion?   @relation(fields: [resumeVersionId], references: [id])
+
+  // Core tracking
+  status             ApplicationStatus @default(WISHLIST)
+  priority           Priority          @default(MEDIUM)
+
+  // Source
+  source             String?
+  sourceUrl          String?
+
+  // Timing
+  appliedAt          DateTime?
+  followUpDueAt      DateTime?
+  nextActionAt       DateTime?
+  nextAction         String?
+
+  // Compensation
+  salaryNotes        String?
+  salaryExpected     Int?
+
+  // Notes and context
+  notes              String?
+  recruiterName      String?
+  recruiterEmail     String?
+
+  // Outcome
+  rejectionReason    String?
+  offerAmount        Int?
+
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  stageEvents        ApplicationStageEvent[]
+}
+
+enum ApplicationStatus {
+  WISHLIST
+  APPLIED
+  RECRUITER_SCREEN
+  TECHNICAL_INTERVIEW
+  CASE_STUDY
+  FINAL_INTERVIEW
+  OFFER
+  ACCEPTED
+  REJECTED
+  WITHDRAWN
+  ON_HOLD
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+model ApplicationStageEvent {
+  id            String      @id @default(cuid())
+  applicationId String
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  stageName     String
+  eventAt       DateTime    @default(now())
+  notes         String?
+  metadata      Json        @default("{}")
+}
+
+// ─── Source Ingestion Runs ───────────────────────────────────────────────────
+
+model IngestionRun {
+  id             String          @id @default(cuid())
+  sourceName     String
+  status         IngestionStatus
+  recordsFound   Int             @default(0)
+  recordsCreated Int             @default(0)
+  recordsUpdated Int             @default(0)
+  recordsSkipped Int             @default(0)
+  errorCount     Int             @default(0)
+  startedAt      DateTime        @default(now())
+  completedAt    DateTime?
+  logs           Json            @default("[]")
+}
+
+enum IngestionStatus {
+  RUNNING
+  COMPLETED
+  FAILED
+  PARTIAL
+}
+
+// ─── Experiments / Learning ──────────────────────────────────────────────────
+
+model Experiment {
+  id                 String           @id @default(cuid())
+  candidateProfileId String
+  candidateProfile   CandidateProfile @relation(fields: [candidateProfileId], references: [id], onDelete: Cascade)
+
+  experimentType     String           // e.g. "resume_summary_variant", "outreach_tone"
+  hypothesis         String
+  variantA           Json
+  variantB           Json
+  status             ExperimentStatus @default(ACTIVE)
+  result             Json?
+  conclusion         String?
+
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+}
+
+enum ExperimentStatus {
+  ACTIVE
+  CONCLUDED
+  PAUSED
+}
