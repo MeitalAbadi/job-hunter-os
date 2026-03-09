@@ -21,7 +21,10 @@ async function main() {
 
   const user = await db.user.upsert({
     where: { email: singleUserEmail },
-    update: {},
+    update: {
+      name: singleUserName,
+      passwordHash,
+    },
     create: {
       email: singleUserEmail,
       name: singleUserName,
