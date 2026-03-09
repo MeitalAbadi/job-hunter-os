@@ -1,20 +1,19 @@
 // app/(dashboard)/page.tsx
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth/options";
 import { db } from "../../lib/db";
 import Link from "next/link";
+import { getOrCreateSingleUserContext } from "@/lib/auth/single-user";
 
-async function getDashboardData(email: string) {
-  const user = await db.user.findUnique({
-    where: { email },
-    include: { candidateProfile: true },
+async function getDashboardData() {
+  const context = await getOrCreateSingleUserContext();
+  const profile = await db.candidateProfile.findUnique({
+    where: { id: context.candidateProfileId },
   });
 
-  if (!user?.candidateProfile) {
+  if (!profile) {
     return { profile: null, stats: null, recentApps: [] };
   }
 
-  const profileId = user.candidateProfile.id;
+  const profileId = profile.id;
 
   const [totalJobs, scoredJobs, appsByStatus, recentApps, followUpsDue] = await Promise.all([
     db.job.count({ where: { isActive: true } }),
@@ -56,7 +55,7 @@ async function getDashboardData(email: string) {
     .reduce((sum, s) => sum + s._count, 0);
 
   return {
-    profile: user.candidateProfile,
+    profile,
     stats: { totalJobs, strongApply, totalApps, activeApps, offers, interviews, followUpsDue },
     recentApps,
   };
@@ -74,8 +73,7 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 export default async function DashboardPage() {
-  const session = await getServerSession(authOptions);
-  const { profile, stats, recentApps } = await getDashboardData(session!.user!.email!);
+  const { profile, stats, recentApps } = await getDashboardData();
 
   if (!profile) {
     return (

@@ -14,10 +14,6 @@ export const env = {
   // DB
   DATABASE_URL: requireEnv("DATABASE_URL"),
 
-  // Auth
-  NEXTAUTH_SECRET: requireEnv("NEXTAUTH_SECRET"),
-  NEXTAUTH_URL: process.env.NEXTAUTH_URL || "http://localhost:3000",
-
   // LLM — server-side only
   ANTHROPIC_API_KEY: requireEnv("ANTHROPIC_API_KEY"),
 

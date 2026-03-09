@@ -1,23 +1,12 @@
 const { PrismaClient } = require("@prisma/client");
-const bcrypt = require("bcryptjs");
 require("dotenv").config({ path: ".env" });
 
 const db = new PrismaClient();
 
 async function main() {
-  const singleUserEmail =
-    process.env.SINGLE_USER_EMAIL || "meital@jobhunter.local";
-  const singleUserName =
-    process.env.SINGLE_USER_NAME || "Meital Abadi";
-  const singleUserPassword =
-    process.env.SINGLE_USER_PASSWORD ||
-    process.env.SEED_PASSWORD ||
-    "changeme123";
-
-  const passwordHash = await bcrypt.hash(
-    singleUserPassword,
-    12
-  );
+  const singleUserEmail = "meital@jobhunter.local";
+  const singleUserName = "Meital Abadi";
+  const passwordHash = "AUTH_DISABLED_PERSONAL_MODE";
 
   const user = await db.user.upsert({
     where: { email: singleUserEmail },
@@ -171,7 +160,6 @@ async function main() {
 
   console.log("Seed complete");
   console.log(`Single user: ${singleUserEmail}`);
-  console.log(`Password: ${singleUserPassword}`);
 }
 
 main()

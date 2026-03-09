@@ -21,7 +21,6 @@
     "date-fns": "^3.6.0",
     "dotenv": "^17.3.1",
     "next": "14.2.5",
-    "next-auth": "^4.24.7",
     "zod": "^3.23.8"
   },
   "devDependencies": {

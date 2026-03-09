@@ -1,14 +1,7 @@
-import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
 
-export const SINGLE_USER_EMAIL =
-  process.env.SINGLE_USER_EMAIL || "meital@jobhunter.local";
-export const SINGLE_USER_NAME =
-  process.env.SINGLE_USER_NAME || "Meital Abadi";
-export const SINGLE_USER_PASSWORD =
-  process.env.SINGLE_USER_PASSWORD ||
-  process.env.SEED_PASSWORD ||
-  "changeme123";
+export const SINGLE_USER_EMAIL = "meital@jobhunter.local";
+export const SINGLE_USER_NAME = "Meital Abadi";
 
 export interface SingleUserContext {
   userId: string;
@@ -30,12 +23,11 @@ export async function getOrCreateSingleUserContext(): Promise<SingleUserContext>
   }
 
   if (!user) {
-    const passwordHash = await bcrypt.hash(SINGLE_USER_PASSWORD, 10);
     user = await db.user.create({
       data: {
         email: SINGLE_USER_EMAIL,
         name: SINGLE_USER_NAME,
-        passwordHash,
+        passwordHash: "AUTH_DISABLED_PERSONAL_MODE",
       },
       include: { candidateProfile: true },
     });
@@ -69,30 +61,5 @@ export async function getOrCreateSingleUserContext(): Promise<SingleUserContext>
     userId: user.id,
     candidateProfileId: user.candidateProfile.id,
     email: user.email,
-  };
-}
-
-export async function authenticateSingleUser(password: string): Promise<{
-  id: string;
-  email: string;
-  name: string;
-} | null> {
-  if (!password) return null;
-
-  const context = await getOrCreateSingleUserContext();
-  const user = await db.user.findUnique({
-    where: { id: context.userId },
-    select: { id: true, email: true, name: true, passwordHash: true },
-  });
-
-  if (!user) return null;
-
-  const ok = await bcrypt.compare(password, user.passwordHash);
-  if (!ok) return null;
-
-  return {
-    id: user.id,
-    email: user.email,
-    name: user.name || SINGLE_USER_NAME,
   };
 }

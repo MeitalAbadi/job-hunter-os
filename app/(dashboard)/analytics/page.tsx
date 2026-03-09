@@ -1,16 +1,9 @@
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth/options";
 import { db } from "../../../lib/db";
+import { getOrCreateSingleUserContext } from "@/lib/auth/single-user";
 
-async function getAnalytics(email: string) {
-  const user = await db.user.findUnique({
-    where: { email },
-    include: { candidateProfile: true },
-  });
-
-  if (!user?.candidateProfile) return null;
-
-  const candidateProfileId = user.candidateProfile.id;
+async function getAnalytics() {
+  const context = await getOrCreateSingleUserContext();
+  const candidateProfileId = context.candidateProfileId;
   const [scores, apps, interviews, offers, responses] = await Promise.all([
     db.jobScore.findMany({
       where: { candidateProfileId },
@@ -87,8 +80,7 @@ function StatCard(props: { label: string; value: string | number; sub?: string; 
 }
 
 export default async function AnalyticsPage() {
-  const session = await getServerSession(authOptions);
-  const analytics = await getAnalytics(session?.user?.email || "");
+  const analytics = await getAnalytics();
 
   if (!analytics) {
     return (
